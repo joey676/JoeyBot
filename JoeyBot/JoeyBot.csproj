@@ -56,6 +56,7 @@
       <HintPath>..\packages\RLBot.Framework.1.0.0\lib\net461\FlatBuffers.dll</HintPath>
       <Private>True</Private>
     </Reference>
+    <Reference Include="PresentationCore" />
     <Reference Include="RLBotDotNet, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
       <HintPath>..\packages\RLBot.Framework.1.0.0\lib\net461\RLBotDotNet.dll</HintPath>
       <Private>True</Private>

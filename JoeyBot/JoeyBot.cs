@@ -23,7 +23,7 @@ namespace JoeyBot
         }
 
         private Target target;
-
+        private Target prevTarget;
         private const float smallSteering = 0.1f;
         private const float medSteering = 0.2f;
         private const float largeSteering = 0.7f;
@@ -76,10 +76,11 @@ namespace JoeyBot
                 int ownGoalY = team == 0 ? -5000 : 5000;
                 int oppGoalY = team == 0 ? 5000 : -5000;
 
-
                 // Calculate to get the angle from the front of the bot's car to the target.
                 //If car is in front of ball aim for goal, else aim for ball
-
+                var ballTrajectoryX = ballLocation.X;
+                var ballTrajectoryY = ballLocation.Y;
+                var ballTrajectoryZ = ballLocation.Z;
                 double botToTargetAngle;
                 double botToBallAngle;
                 double botToOppGoalAngle;
@@ -100,14 +101,14 @@ namespace JoeyBot
                 }
               
                 //defending when blue
-                else if (team == 0 && carLocation.Y > ballLocation.Y)
+                else if (team == 0 && (carLocation.Y > ballLocation.Y || (prevTarget == Target.AwayFromGoal && carLocation.Y > ballLocation.Y - 1000)))
                 {
                     botToTargetAngle = Math.Atan2(-5000 - carLocation.Y, 0 - carLocation.X);
                     controller.Boost = true;
                     target = Target.Goal;
                 }
                 //defending when orange
-                else if (team == 1 && carLocation.Y < ballLocation.Y)
+                else if (team == 1 && (carLocation.Y < ballLocation.Y || (prevTarget == Target.AwayFromGoal && carLocation.Y < ballLocation.Y + 1000)))
                 {
                     botToTargetAngle = Math.Atan2(5000 - carLocation.Y, 0 - carLocation.X);
                     controller.Boost = true;
@@ -146,8 +147,8 @@ namespace JoeyBot
                     guidingBall = true;
                     var complete = false;
 
-                    var ballTrajectoryX = ballLocation.X;
-                    var ballTrajectoryY = ballLocation.Y;
+                     ballTrajectoryX = ballLocation.X;
+                     ballTrajectoryY = ballLocation.Y;
                     
                     while (!complete)
                     {
@@ -229,9 +230,7 @@ namespace JoeyBot
                             //work out landing point - or next contact with wall
                             var complete = false;
 
-                            var ballTrajectoryX = ballLocation.X;
-                            var ballTrajectoryY = ballLocation.Y;
-                            var ballTrajectoryZ = ballLocation.Z;
+                            
 
                             while (!complete)
                             {
@@ -269,7 +268,7 @@ namespace JoeyBot
                                         {
                                             controller.Throttle = (float)(distance / distanceInFrames);
                                             controller.Steer = SetTarget(gameTickPacket, index, ballVelocity.X, ballVelocity.Y);
-                                            Console.WriteLine(controller.Steer);
+                                           
                                             complete = true;
                                         }
 
@@ -389,8 +388,26 @@ namespace JoeyBot
                     }
                    
                 }
-              
-                
+                switch (target)
+                {
+                    case Target.Ball:
+                Renderer.DrawLine3D(System.Windows.Media.Color.FromRgb(255, 0, 0), new System.Numerics.Vector3(carLocation.X, carLocation.Y, carLocation.Z), new System.Numerics.Vector3(ballLocation.X, ballLocation.Y, ballLocation.Z));
+                        break;
+                    case Target.BallLandingPoint:
+                        Renderer.DrawLine3D(System.Windows.Media.Color.FromRgb(0, 255, 0), new System.Numerics.Vector3(carLocation.X, carLocation.Y, carLocation.Z), new System.Numerics.Vector3(ballTrajectoryX, ballTrajectoryY, ballTrajectoryZ));
+                        break;
+                    case Target.Goal:
+                        Renderer.DrawLine3D(System.Windows.Media.Color.FromRgb(0, 0, 255), new System.Numerics.Vector3(carLocation.X, carLocation.Y, carLocation.Z), new System.Numerics.Vector3(0, ownGoalY, 10));
+                        break;
+                    case Target.AwayFromGoal:
+                        Renderer.DrawLine3D(System.Windows.Media.Color.FromRgb(0, 0, 0), new System.Numerics.Vector3(carLocation.X, carLocation.Y, carLocation.Z), new System.Numerics.Vector3(ballLocation.X, ballLocation.Y, ballLocation.Z));
+                        break;
+                    case Target.Undecided:
+                        Renderer.DrawLine3D(System.Windows.Media.Color.FromRgb(255, 255, 255), new System.Numerics.Vector3(carLocation.X, carLocation.Y, carLocation.Z), new System.Numerics.Vector3(ballLocation.X, ballLocation.Y, ballLocation.Z));
+                        break;
+                }
+                prevTarget = target;
+
                 LastPositionX = carLocation.X;
                 LastPositionY = carLocation.Y;
                 LastBallPositionX = ballLocation.X;
@@ -406,11 +423,11 @@ namespace JoeyBot
 
 
 
-            var buffer = new FlatBuffers.FlatBufferBuilder(1000);
-            QuickChat.StartQuickChat(buffer);
-            QuickChat.AddQuickChatSelection(buffer, QuickChatSelection.Compliments_WhatASave);
+            //var buffer = new FlatBuffers.FlatBufferBuilder(1000);
+            //QuickChat.StartQuickChat(buffer);
+            //QuickChat.AddQuickChatSelection(buffer, QuickChatSelection.Compliments_WhatASave);
 
-            QuickChat.EndQuickChat(buffer);
+            //QuickChat.EndQuickChat(buffer);
 
             return controller;
         }
