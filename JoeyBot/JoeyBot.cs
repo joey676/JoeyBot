@@ -101,14 +101,14 @@ namespace JoeyBot
                 }
               
                 //defending when blue
-                else if (team == 0 && (carLocation.Y > ballLocation.Y || (prevTarget == Target.AwayFromGoal && carLocation.Y > ballLocation.Y - 1000)))
+                else if (team == 0 && (carLocation.Y > ballLocation.Y || (prevTarget == Target.Goal && carLocation.Y > ballLocation.Y - 1000)))
                 {
                     botToTargetAngle = Math.Atan2(-5000 - carLocation.Y, 0 - carLocation.X);
                     controller.Boost = true;
                     target = Target.Goal;
                 }
                 //defending when orange
-                else if (team == 1 && (carLocation.Y < ballLocation.Y || (prevTarget == Target.AwayFromGoal && carLocation.Y < ballLocation.Y + 1000)))
+                else if (team == 1 && (carLocation.Y < ballLocation.Y || (prevTarget == Target.Goal && carLocation.Y < ballLocation.Y + 1000)))
                 {
                     botToTargetAngle = Math.Atan2(5000 - carLocation.Y, 0 - carLocation.X);
                     controller.Boost = true;
@@ -220,6 +220,7 @@ namespace JoeyBot
                 else
                 {
 
+
                     if (target == Target.BallLandingPoint)
                     {
                         //speed calculation based on height of ball
@@ -267,7 +268,7 @@ namespace JoeyBot
                                         else
                                         {
                                             controller.Throttle = (float)(distance / distanceInFrames);
-                                            controller.Steer = SetTarget(gameTickPacket, index, ballVelocity.X, ballVelocity.Y);
+                                            
                                            
                                             complete = true;
                                         }
@@ -292,6 +293,7 @@ namespace JoeyBot
 
 
                             }
+                                    controller.Steer = SetTarget(gameTickPacket, index, ballVelocity.X, ballVelocity.Y);
 
 
                         }
@@ -323,7 +325,8 @@ namespace JoeyBot
                 {
                     target = Target.Ball;
                     controller.Boost = true;
-                }
+                        controller.Steer = SetTarget(gameTickPacket, index, 0, 0);
+                    }
 
 
                 
@@ -395,6 +398,7 @@ namespace JoeyBot
                         break;
                     case Target.BallLandingPoint:
                         Renderer.DrawLine3D(System.Windows.Media.Color.FromRgb(0, 255, 0), new System.Numerics.Vector3(carLocation.X, carLocation.Y, carLocation.Z), new System.Numerics.Vector3(ballTrajectoryX, ballTrajectoryY, ballTrajectoryZ));
+                        
                         break;
                     case Target.Goal:
                         Renderer.DrawLine3D(System.Windows.Media.Color.FromRgb(0, 0, 255), new System.Numerics.Vector3(carLocation.X, carLocation.Y, carLocation.Z), new System.Numerics.Vector3(0, ownGoalY, 10));
@@ -440,10 +444,12 @@ namespace JoeyBot
             double botFrontToTargetAngle = botToTargetAngle - carRotation.Yaw;
             botFrontToTargetAngle = CorrectAngle(botFrontToTargetAngle);
             if (botFrontToTargetAngle == 0) return 0;
-            if (botFrontToTargetAngle > 0 && botFrontToTargetAngle < DegreesToRadians(30)) return medSteering;
-            if (botFrontToTargetAngle > 0 && botFrontToTargetAngle > DegreesToRadians(30)) return largeSteering;
-            if (botFrontToTargetAngle < 0 && Math.Abs(botFrontToTargetAngle) < DegreesToRadians(30)) return -medSteering;
-            if (botFrontToTargetAngle > 0 && Math.Abs(botFrontToTargetAngle) > DegreesToRadians(30)) return -largeSteering;
+            if (botFrontToTargetAngle > 0 && botFrontToTargetAngle < DegreesToRadians(30)) return smallSteering;
+            if (botFrontToTargetAngle > 0 && botFrontToTargetAngle < DegreesToRadians(100)) return medSteering;
+            if (botFrontToTargetAngle > 0 && botFrontToTargetAngle > DegreesToRadians(100)) return largeSteering;
+            if (botFrontToTargetAngle < 0 && Math.Abs(botFrontToTargetAngle) < DegreesToRadians(30)) return -smallSteering;
+            if (botFrontToTargetAngle < 0 && botFrontToTargetAngle < DegreesToRadians(100)) return -medSteering;
+            if (botFrontToTargetAngle < 0 && Math.Abs(botFrontToTargetAngle) > DegreesToRadians(100)) return -largeSteering;
             return 0;
 
 
