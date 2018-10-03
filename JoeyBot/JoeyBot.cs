@@ -211,8 +211,11 @@ namespace JoeyBot
                         if (botFrontToBallAngle > DegreesToRadians(180)) controller.Steer *= -1;
 
                         if (ballVelocity.X == 0 && ballVelocity.Y == 0) { complete = true; }
-                        ballTrajectoryX += ballVelocity.X;
-                        ballTrajectoryY += ballVelocity.Y;
+                        if (!complete)
+                        {
+                            ballTrajectoryX += ballVelocity.X;
+                            ballTrajectoryY += ballVelocity.Y;
+                        }
                     }
                     //Console.WriteLine(controller.Steer);
                 }
@@ -293,7 +296,7 @@ namespace JoeyBot
 
 
                             }
-                                    controller.Steer = SetTarget(gameTickPacket, index, ballVelocity.X, ballVelocity.Y);
+                                    controller.Steer = SetTarget(gameTickPacket, index, ballTrajectoryX, ballTrajectoryY);
 
 
                         }
@@ -391,25 +394,25 @@ namespace JoeyBot
                     }
                    
                 }
-                switch (target)
-                {
-                    case Target.Ball:
-                Renderer.DrawLine3D(System.Windows.Media.Color.FromRgb(255, 0, 0), new System.Numerics.Vector3(carLocation.X, carLocation.Y, carLocation.Z), new System.Numerics.Vector3(ballLocation.X, ballLocation.Y, ballLocation.Z));
-                        break;
-                    case Target.BallLandingPoint:
-                        Renderer.DrawLine3D(System.Windows.Media.Color.FromRgb(0, 255, 0), new System.Numerics.Vector3(carLocation.X, carLocation.Y, carLocation.Z), new System.Numerics.Vector3(ballTrajectoryX, ballTrajectoryY, ballTrajectoryZ));
+                //switch (target)
+                //{
+                //    case Target.Ball:
+                //Renderer.DrawLine3D(System.Windows.Media.Color.FromRgb(255, 0, 0), new System.Numerics.Vector3(carLocation.X, carLocation.Y, carLocation.Z), new System.Numerics.Vector3(ballLocation.X, ballLocation.Y, ballLocation.Z));
+                //        break;
+                //    case Target.BallLandingPoint:
+                //        Renderer.DrawLine3D(System.Windows.Media.Color.FromRgb(0, 255, 0), new System.Numerics.Vector3(carLocation.X, carLocation.Y, carLocation.Z), new System.Numerics.Vector3(ballTrajectoryX, ballTrajectoryY, ballTrajectoryZ));
                         
-                        break;
-                    case Target.Goal:
-                        Renderer.DrawLine3D(System.Windows.Media.Color.FromRgb(0, 0, 255), new System.Numerics.Vector3(carLocation.X, carLocation.Y, carLocation.Z), new System.Numerics.Vector3(0, ownGoalY, 10));
-                        break;
-                    case Target.AwayFromGoal:
-                        Renderer.DrawLine3D(System.Windows.Media.Color.FromRgb(0, 0, 0), new System.Numerics.Vector3(carLocation.X, carLocation.Y, carLocation.Z), new System.Numerics.Vector3(ballLocation.X, ballLocation.Y, ballLocation.Z));
-                        break;
-                    case Target.Undecided:
-                        Renderer.DrawLine3D(System.Windows.Media.Color.FromRgb(255, 255, 255), new System.Numerics.Vector3(carLocation.X, carLocation.Y, carLocation.Z), new System.Numerics.Vector3(ballLocation.X, ballLocation.Y, ballLocation.Z));
-                        break;
-                }
+                //        break;
+                //    case Target.Goal:
+                //        Renderer.DrawLine3D(System.Windows.Media.Color.FromRgb(0, 0, 255), new System.Numerics.Vector3(carLocation.X, carLocation.Y, carLocation.Z), new System.Numerics.Vector3(0, ownGoalY, 10));
+                //        break;
+                //    case Target.AwayFromGoal:
+                //        Renderer.DrawLine3D(System.Windows.Media.Color.FromRgb(0, 0, 0), new System.Numerics.Vector3(carLocation.X, carLocation.Y, carLocation.Z), new System.Numerics.Vector3(ballLocation.X, ballLocation.Y, ballLocation.Z));
+                //        break;
+                //    case Target.Undecided:
+                //        Renderer.DrawLine3D(System.Windows.Media.Color.FromRgb(255, 255, 255), new System.Numerics.Vector3(carLocation.X, carLocation.Y, carLocation.Z), new System.Numerics.Vector3(ballLocation.X, ballLocation.Y, ballLocation.Z));
+                //        break;
+                //}
                 prevTarget = target;
 
                 LastPositionX = carLocation.X;
