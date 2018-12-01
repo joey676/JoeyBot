@@ -10,7 +10,7 @@ namespace JoeyBot
         // We want the constructor for ExampleBot to extend from Bot, but we don't want to add anything to it.
         public JoeyBot(string botName, int botTeam, int botIndex) : base(botName, botTeam, botIndex) {
 
-           
+         
         }
 
         private enum Target
@@ -23,8 +23,16 @@ namespace JoeyBot
             BallInAir
         }
 
+        private enum GameMode
+        {
+            Soccar,
+            Hoops,
+            Dropshot
+        }
+
         private Target target;
         private Target prevTarget;
+        private GameMode mode;
         private const float smallSteering = 0.1f;
         private const float medSteering = 0.2f;
         private const float largeSteering = 0.7f;
@@ -92,8 +100,15 @@ namespace JoeyBot
 
 
 
-                //car is in goal
+
                 float goalY = Math.Abs(GetFieldInfo().Goals(0).Value.Location.Value.Y);
+                if (GetFieldInfo().GoalsLength > 2) mode = GameMode.Dropshot;
+                else if (goalY == 5120) mode = GameMode.Soccar;
+                else mode = GameMode.Hoops;
+
+                int fieldLength = GetFieldLength(mode);
+
+                //car is in goal
                 if (GetFieldInfo().GoalsLength == 2 && (carLocation.Y < (goalY * -1) || carLocation.Y > goalY) )
                 {
                     botToTargetAngle = Math.Atan2(-carLocation.Y, -carLocation.X);
@@ -104,7 +119,12 @@ namespace JoeyBot
                     target = Target.Ball;
                     botToTargetAngle = Math.Atan2(0 - carLocation.Y, 0 - carLocation.X);
                 }
-              
+                else if (ballLocation.X == 0 && ballLocation.Y == 0 )
+                {
+                    target = Target.BallInAir;
+                    botToTargetAngle = Math.Atan2(0 - carLocation.Y, 0 - carLocation.X);
+                }
+
                 //defending when blue
                 else if (GetFieldInfo().GoalsLength == 2 && team == 0 && (carLocation.Y > ballLocation.Y || (prevTarget == Target.Goal && carLocation.Y > ballLocation.Y - 1000)))
                 {
@@ -158,7 +178,7 @@ namespace JoeyBot
                 else
                 {
 
-                    if (Math.Abs(carLocation.Y) < 4950 && Math.Abs(carLocation.X) > 1500 && (botFrontToTargetAngle > MinimumSteeringAngleRadians * 2 || botFrontToTargetAngle < MinimumSteeringAngleRadians * -2)) controller.Handbrake = true;
+                    if (Math.Abs(carLocation.Y) <  4950 && Math.Abs(carLocation.X) > 1500 && (botFrontToTargetAngle > MinimumSteeringAngleRadians * 2 || botFrontToTargetAngle < MinimumSteeringAngleRadians * -2)) controller.Handbrake = true;
                     if (botFrontToTargetAngle > DegreesToRadians(135) || botFrontToTargetAngle < DegreesToRadians(-135)) controller.Handbrake = true;
 
                     if (carLocation.Z > 30) controller.Handbrake = false;
@@ -178,9 +198,9 @@ namespace JoeyBot
 
                         while (!complete)
                         {
-                            if (ballTrajectoryY > 5000)
+                            if (ballTrajectoryY > GetFieldLength(mode))
                             {
-                                if (oppGoalY == 5000)
+                                if (oppGoalY == 5000 && mode == GameMode.Soccar)
                                 {
                                     if (ballLocation.X < 700 && ballLocation.X > -700)
                                         complete = true;
@@ -198,10 +218,10 @@ namespace JoeyBot
                                     complete = true;
                                 }
                             }
-                            else if (ballTrajectoryY < -5000)
+                            else if (ballTrajectoryY < GetFieldLength(mode) * -1)
                             {
 
-                                if (oppGoalY == -5000)
+                                if (oppGoalY == -5000 && mode == GameMode.Soccar)
                                 {
                                     if (ballLocation.X < 700 && ballLocation.X > -700)
                                         complete = true;
@@ -219,13 +239,13 @@ namespace JoeyBot
                                     complete = true;
                                 }
                             }
-                            else if (ballTrajectoryX < -700 && ballLocation.X > -700)
+                            else if (ballTrajectoryX < -700 && ballLocation.X > -700 && mode == GameMode.Soccar)
                             {
                                 controller.Steer = -smallSteering;
                                 complete = true;
                             }
 
-                            else if (ballTrajectoryX > 700 && ballLocation.X < 700)
+                            else if (ballTrajectoryX > 700 && ballLocation.X < 700 && mode == GameMode.Soccar)
                             {
                                 controller.Steer = smallSteering;
 
@@ -265,7 +285,7 @@ namespace JoeyBot
                                 while (!complete)
                                 {
 
-                                    if ((Math.Abs(ballTrajectoryX) > 3800 || Math.Abs(ballTrajectoryY) > 5000) && target != Target.Goal)
+                                    if (Math.Abs(ballTrajectoryX) > GetFieldWidth(mode) || Math.Abs(ballTrajectoryY) > GetFieldLength(mode))
                                     {
                                         controller.Throttle = 0;
                                         controller.Boost = false;
@@ -462,7 +482,7 @@ namespace JoeyBot
             }
 
 
-
+           
 
             //var buffer = new FlatBuffers.FlatBufferBuilder(1000);
             //QuickChat.StartQuickChat(buffer);
@@ -471,6 +491,34 @@ namespace JoeyBot
             //QuickChat.EndQuickChat(buffer);
 
             return controller;
+        }
+
+        private int GetFieldLength(GameMode mode)
+        {
+            switch (mode)
+            {
+                case GameMode.Soccar:
+                    return 5100;
+                case GameMode.Hoops:
+                    return 3250;
+                case GameMode.Dropshot:
+                    return 4200;
+            }
+            return 0;
+        }
+
+        private int GetFieldWidth(GameMode mode)
+        {
+            switch (mode)
+            {
+                case GameMode.Soccar:
+                    return 3750;
+                case GameMode.Hoops:
+                    return 2700;
+                case GameMode.Dropshot:
+                    return 4600;
+            }
+            return 0;
         }
 
         private static float SetSteerTarget(GameTickPacket gameTickPacket, int index, double x, double y, double z = 0)
