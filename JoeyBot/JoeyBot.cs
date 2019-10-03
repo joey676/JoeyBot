@@ -51,7 +51,7 @@ namespace JoeyBot
         private const float largeSteering = 0.7f;
         static int MinimumSteeringAngleDegrees = 10;
         static double MinimumSteeringAngleRadians = DegreesToRadians(MinimumSteeringAngleDegrees);
-        static int DistanceToJump = 300;
+        static int DistanceToJump = 325;
 
         static bool Jump1 = false;
         static bool firstLoopComplete = false;
@@ -112,7 +112,10 @@ namespace JoeyBot
 
                 Rotator carRotation = playerInfo.Physics.Value.Rotation.Value;
                 Vector3 ballVelocity = ballInfo.Physics.Value.Velocity.Value;
-                Vector3 carVelocity = playerInfo.Physics.Value.Velocity.Value;
+                Vector3 carVelocityStruct = playerInfo.Physics.Value.Velocity.Value;
+
+                System.Numerics.Vector3 carVelocity = new System.Numerics.Vector3(carVelocityStruct.X, carVelocityStruct.Y, carVelocityStruct.Z);
+                var velocityValue = Math.Sqrt(carVelocity.LengthSquared());
                 int ownGoalY = team == 0 ? -5000 : 5000;
                 int oppGoalY = team == 0 ? 5000 : -5000;
 
@@ -174,16 +177,17 @@ namespace JoeyBot
                 {
                     botToTargetAngle = botToBallAngle;
 
-                    if (playerInfo.Boost < 10 && ballLocation.Z > 500)
-                        target = Target.BallLandingPoint;
+                    if (playerInfo.Boost > 10 && ballLocation.Z > 700)
+                        target = Target.BallInAir;
                     else
                     {
-                        if (ballLocation.Z > 700)
+                        if (ballLocation.Z > 300)
                         {
-                            target = Target.BallInAir;
+                            target = Target.BallLandingPoint;
                         }
                         else
                         {
+
                             target = Target.Ball;
                         }
                     }
@@ -254,8 +258,8 @@ namespace JoeyBot
                 else
                 {
 
-                    if (Math.Abs(carLocation.Y) < 4950 && Math.Abs(carLocation.X) > 1500 && (botFrontToTargetAngle > MinimumSteeringAngleRadians * 2 || botFrontToTargetAngle < MinimumSteeringAngleRadians * -2)) controller.Handbrake = true;
-                    if (Math.Abs(botFrontToTargetAngle) > DegreesToRadians(150))
+                    //if (Math.Abs(carLocation.Y) < 4950 && Math.Abs(carLocation.X) > 1500 && (botFrontToTargetAngle > MinimumSteeringAngleRadians * 2 || botFrontToTargetAngle < MinimumSteeringAngleRadians * -2)) controller.Handbrake = true;
+                    if (Math.Abs(botFrontToTargetAngle) > DegreesToRadians(160) && Math.Sqrt(carVelocity.LengthSquared()) > 0.6)
                     {
                         controller.Handbrake = true;
                         controller.Boost = false;
@@ -354,82 +358,67 @@ namespace JoeyBot
 
                         if (target == Target.BallLandingPoint)
                         {
-                            //speed calculation based on height of ball
-
-                            //ball dropping
-                            if (ballVelocity.Z < 0)
+                            if (ballVelocity.X == 0 && ballVelocity.Y == 0)
                             {
-                                //work out landing point - or next contact with wall
-                                var complete = false;
+                                controller.Throttle = 1;
+                                controller.Boost = true;
+
+                            }
+                            else
+                            {
 
 
+                                //speed calculation based on height of ball
 
-                                while (!complete)
+                                var slice = ballPrediction.GetNextGroundTouch();
+
+
+                                if (slice != null)
                                 {
 
-                                    if (Math.Abs(ballTrajectoryX) > GetFieldWidth(mode) || Math.Abs(ballTrajectoryY) > GetFieldLength(mode))
+                                    var target = slice.Value;
+
+
+
+                                    var distance = Math.Abs(Get2DDistance(target.Position.X, carLocation.X, target.Position.Y, carLocation.Y));
+
+
+                                    var time = target.Time;
+                                    var currentDistance = time * velocityValue;
+
+                                    if (currentDistance < distance)
+                                    {
+
+                                        controller.Throttle = 1;
+                                        controller.Boost = true;
+
+
+                                    }
+                                    else
                                     {
                                         controller.Throttle = 0;
                                         controller.Boost = false;
-                                        complete = true;
+
+
                                     }
-                                    else if (ballTrajectoryZ < 0)
-                                    {
-                                        var distance = Math.Abs(Get2DDistance(ballTrajectoryX, carLocation.X, ballTrajectoryY, carLocation.Y));
-                                        var distanceTravelled = Math.Abs(Get2DDistance(LastPositionX, carLocation.X, LastPositionY, carLocation.Y));
-                                        var ballVerticalDistance = LastBallPositionZ - ballLocation.Z;
-                                        if (ballVerticalDistance == 0)
-                                        {
-                                            controller.Throttle = 1;
-                                            complete = true;
-                                        }
-                                        else
-                                        {
-                                            var framesToLand = Math.Ceiling(ballLocation.Z / ballVerticalDistance);
-                                            var distanceInFrames = distanceTravelled * framesToLand;
-
-                                            if (distanceInFrames < distance)
-                                            {
-
-                                                controller.Throttle = 1;
-                                                controller.Boost = true;
-                                                complete = true;
-
-                                            }
-                                            else
-                                            {
-                                                controller.Throttle = (float)(distance / distanceInFrames);
 
 
-                                                complete = true;
-                                            }
 
-                                        }
-
-
-                                        if (ballVelocity.X == 0 && ballVelocity.Y == 0)
-                                        {
-                                            controller.Throttle = 1;
-                                            controller.Boost = true;
-                                            complete = true;
-                                        }
-                                    }
-                                    if (!complete)
-                                    {
-                                        ballTrajectoryX += ballVelocity.X;
-                                        ballTrajectoryY += ballVelocity.Y;
-                                        ballTrajectoryZ += ballVelocity.Z;
-                                    }
 
 
 
                                 }
+
+
                                 controller.Steer = SetSteerTarget(gameTickPacket, index, ballTrajectoryX, ballTrajectoryY);
-
-
                             }
-                            else { controller.Throttle = 0; }
                         }
+
+
+
+
+                        
+                    
                         else
                         {
 
@@ -451,7 +440,7 @@ namespace JoeyBot
 
 
                         
-
+                        //kickoff!!!
 
                         if (ballLocation.X == 0 && ballLocation.Y == 0 && ballLocation.Z < 300)
                         {
@@ -578,9 +567,9 @@ namespace JoeyBot
                 Console.WriteLine(e.StackTrace);
             }
 
-            
-            
 
+            if(target == Target.AwayFromGoal)
+            controller.Handbrake = true;
             
          
             return controller;

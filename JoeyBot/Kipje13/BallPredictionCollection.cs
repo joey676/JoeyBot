@@ -47,6 +47,17 @@ namespace KipjeBot
         {
             return ToArray(Length);
         }
+
+        public Slice? GetNextGroundTouch()
+        {
+            Slice[] slices = ToArray();
+            for (int i = 0; i < slices.Length; i++)
+            {
+                if (slices[i].Position.Z < 110) return slices[i];
+            }
+            return null;
+        }
+
     }
 
     public struct Slice
