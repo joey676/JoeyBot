@@ -148,6 +148,21 @@ namespace KipjeBot
             Left = Vector3.Transform(Vector3.UnitY, Rotation);
             Up = Vector3.Transform(Vector3.UnitZ, Rotation);
         } 
+
+        public double DistanceToPoint(double x, double y)
+        {
+            return Math.Sqrt(Math.Pow((this.Position.X - x), 2) + Math.Pow((this.Position.Y - y), 2));
+        }
+        public double DistanceToCentre()
+        {
+            return DistanceToPoint(0, 0);
+        }
+
+        public double DistanceToBall(Ball ball)
+        {
+            return DistanceToPoint(ball.Position.X, ball.Position.Y);
+        }
+
         #endregion 
     }
 }
