@@ -38,7 +38,8 @@ namespace JoeyBot
             BallInAir,
             Waiting,
             GuidingBall,
-            Kickoff
+            Kickoff,
+            SpecificPoint
         }
 
         private enum GameMode
@@ -52,14 +53,15 @@ namespace JoeyBot
         private Target prevTarget;
         Aerial aerial = null;
         private GameMode mode;
-        private const float smallSteering = 0.1f;
-        private const float medSteering = 0.2f;
-        private const float largeSteering = 0.7f;
+        private const float smallSteering = 0.3f;
+        private const float medSteering = 0.7f;
+        private const float largeSteering = 1f;
         private const float ownGoalTurnDistance = 850;
         private const int ballLandingPointHeight = 200;
         private const int maxAerialTrajectoryAngleDegrees = 10;
         private const int GoalieBallTargetY = 700;
         private const int GoalieWaitY = 2500;
+        private const int MinTeammatesForWait = 2;
         static int MinimumSteeringAngleDegrees = 10;
         static double MinimumSteeringAngleRadians = DegreesToRadians(MinimumSteeringAngleDegrees);
         static int DistanceToJump = 325;
@@ -75,11 +77,13 @@ namespace JoeyBot
         private double LastBallPositionX;
         private double LastBallPositionY;
         private double LastBallPositionZ;
+        private double TargetPointX;
+        private double TargetPointY;
 
         private KipjeBot.GameInfo gameInfo;
         private KipjeBot.GameTickPacket.FieldInfo fieldInfo;
         private BallPredictionCollection ballPrediction;
-
+        private int MinTeammatesForGK = 2;
 
         public override Controller GetOutput(GameTickPacket gameTickPacket)
         {
@@ -148,12 +152,14 @@ namespace JoeyBot
                 botToBallAngle = Math.Atan2(ballLocation.Y - carLocation.Y, ballLocation.X - carLocation.X);
                 double botFrontToBallAngle = botToBallAngle - carRotation.Yaw;
                 botFrontToBallAngle = CorrectAngle(botFrontToBallAngle);
-
                 float goalY = Math.Abs(GetFieldInfo().Goals(0).Value.Location.Value.Y);
                 if (GetFieldInfo().GoalsLength > 2) mode = GameMode.Dropshot;
                 else if (goalY == 5120) mode = GameMode.Soccar;
                 else mode = GameMode.Hoops;
 
+                botToOppGoalAngle = Math.Atan2(oppGoalY - carLocation.Y, 0 - carLocation.X);
+                double botFrontToOppGoalAngle = botToOppGoalAngle - carRotation.Yaw;
+                botFrontToOppGoalAngle = CorrectAngle(botFrontToOppGoalAngle);
                 int fieldLength = GetFieldLength(mode);
                 controller.Jump = false;
                 controller.Handbrake = false;
@@ -178,7 +184,7 @@ namespace JoeyBot
 
 
                 //goalkeeper mode
-                else if (teammates.Count() > 0 && ((ownGoalY < 0 && carLocation.Y < (from x in teammates select x.Position.Y).Min()) || (ownGoalY > 0 && carLocation.Y > (from x in teammates select x.Position.Y).Max())))
+                else if (teammates.Count() >= MinTeammatesForGK  && ((ownGoalY < 0 && carLocation.Y < (from x in teammates select x.Position.Y).Min()) || (ownGoalY > 0 && carLocation.Y > (from x in teammates select x.Position.Y).Max())))
                 {
                     //if (target != Target.AwayFromGoal)
                     //{
@@ -191,6 +197,22 @@ namespace JoeyBot
                         {
                             target = Target.Ball;
                             botToTargetAngle = Math.Atan2(ballLocation.Y - carLocation.Y, ballLocation.X - carLocation.X);
+                        }
+                        else if (ballLocation.Y > 1000)
+                        {
+
+                            if (Math.Abs(ballLocation.X) < 800)
+                            {
+                                target = Target.Ball;
+                                botToTargetAngle = Math.Atan2(ballLocation.Y - carLocation.Y, ballLocation.X - carLocation.X);
+                            }
+                            else if (carLocation.Y < -1000 || Math.Abs(botFrontToBallAngle) > DegreesToRadians(30))
+                            {
+                                target = Target.SpecificPoint;
+                                TargetPointX = 0;
+                                TargetPointY = 0;
+                            }
+                            else { target = Target.Waiting; }
                         }
                         else if (carLocation.Y < GoalieWaitY * -1 && Math.Abs(carLocation.X) < 700 && Math.Abs(botFrontToBallAngle) < DegreesToRadians(45))
                         {
@@ -210,6 +232,23 @@ namespace JoeyBot
                         {
                             target = Target.Ball;
                             botToTargetAngle = Math.Atan2(ballLocation.Y - carLocation.Y, ballLocation.X - carLocation.X);
+
+                        }
+                        else if (ballLocation.Y < -1000)
+                        {
+                            if (Math.Abs(ballLocation.X) < 800)
+                            {
+                                target = Target.Ball;
+                                botToTargetAngle = Math.Atan2(ballLocation.Y - carLocation.Y, ballLocation.X - carLocation.X);
+                            }
+
+                            else if (carLocation.Y > 1000 || Math.Abs(botFrontToBallAngle) > DegreesToRadians(30))
+                            {
+                                target = Target.SpecificPoint;
+                                TargetPointX = 0;
+                                TargetPointY = 0;
+                            }
+                            else { target = Target.Waiting; }
                         }
                         else if (carLocation.Y > GoalieWaitY && Math.Abs(carLocation.X) < 700 && Math.Abs(botFrontToBallAngle) < DegreesToRadians(45))
                         {
@@ -230,8 +269,12 @@ namespace JoeyBot
                 //car is in goal
                 else if (GetFieldInfo().GoalsLength == 2 && ((Math.Abs(carLocation.Y) > Math.Abs(goalY) - ownGoalTurnDistance && (prevTarget == Target.Goal || prevTarget == Target.AwayFromGoal)) || carLocation.Y > Math.Abs(goalY)))
                 {
-                    botToTargetAngle = Math.Atan2(-carLocation.Y, -carLocation.X);
-                    target = Target.AwayFromGoal;
+                    botToTargetAngle = Math.Atan2(-carLocation.Y, 0);
+                    if (Math.Abs(ballLocation.X) < 1000) target = Target.Ball;
+                    else
+                    {
+                        target = Target.AwayFromGoal;
+                    }
                 }
 
                 else if (ballLocation.X == 0 && ballLocation.Y == 0)
@@ -266,16 +309,21 @@ namespace JoeyBot
 
                     var goForBall = true;
 
-                    if (teammates.Count > 0)
+                    if (teammates.Count >= MinTeammatesForWait)
                     {
 
                         var distanceToBall = car.DistanceToBall(ball);
                         var teammateDistance = (from x in teammates select x.DistanceToBall(ball)).Min();
 
-                        if (teammateDistance < distanceToBall) goForBall = false;
+                        if (teammateDistance < distanceToBall && teammateDistance < 2000) goForBall = false;
 
+
+                    if (Math.Abs(ballLocation.X) < 1000 && teammateDistance > 500 && teammateDistance < 1500)
+                    {
+                        goForBall = true;
                     }
 
+                    }
 
                     if (goForBall)
                     {
@@ -301,8 +349,50 @@ namespace JoeyBot
                     }
                     else
                     {
-                        //make this bit clever
-                        target = Target.Waiting;
+                       if (Math.Abs(carLocation.X) < 800 && Math.Abs(botFrontToOppGoalAngle)  < DegreesToRadians(30))
+                        {
+                            //if ball behind, reposition other side of ball
+
+                            target = Target.Waiting;
+                            //blue
+                            if (team == 0)
+                            {
+                                if (carLocation.Y > ballLocation.Y)
+                                {
+                                    target = Target.SpecificPoint;
+                                    TargetPointX = carLocation.X;
+                                    TargetPointY = ballLocation.Y - 1000;
+
+                                }
+                            
+                            }
+
+
+                            //orange
+                            else
+                            { 
+                                if (carLocation.Y < ballLocation.Y)
+                                {
+                                    target = Target.SpecificPoint;
+                                    TargetPointX = carLocation.X;
+                                    TargetPointY = ballLocation.Y + 1000;
+
+                                }
+                            }
+
+                        }
+                        else
+                        {
+
+
+                            TargetPointX = 0;
+                            TargetPointY = team == 0 ? 2000 : -2000 ;
+                            if (team == 0 && ballLocation.Y < 2000) TargetPointY = ballLocation.Y - 1000;
+                            if (team == 1 && ballLocation.Y > -2000) TargetPointY = ballLocation.Y + 1000;
+                            target = Target.SpecificPoint;
+                        }
+
+
                     }
                 }
                     
@@ -321,6 +411,25 @@ namespace JoeyBot
                 if (DistanceToBall <= 300 && botFrontToTargetAngle < MinimumSteeringAngleRadians / 2 && ballLocation.Z < 200 && ballLocation.X != 0 && ballLocation.Y != 0)
                 {
                     target = Target.GuidingBall;
+                }
+
+
+                if (target == Target.Ball)
+                {
+                    Slice[] slices = ballPrediction.ToArray();
+                    float targetTime = 0;
+                    double ballVelocityUnit = Math.Sqrt(ballVelocity.X * ballVelocity.X + ballVelocity.Y * ballVelocity.Y);
+                    if (ballVelocityUnit < 200 || DistanceToBall < 600) targetTime = 0.1f;
+                    else if (ballVelocityUnit < 400) targetTime = 0.6f;
+                    else if (ballVelocityUnit < 600) targetTime = 1.25f;
+                    else targetTime = 2;
+                    Slice? targetSlice = slices.Where(x => x.Time - gameInfo.Time >= targetTime).FirstOrDefault();
+                    if (targetSlice != null)
+                    {
+                        target = Target.SpecificPoint;
+                        TargetPointX = targetSlice.Value.Position.X;
+                        TargetPointY = targetSlice.Value.Position.Y;
+                    }
                 }
 
 
@@ -532,6 +641,28 @@ namespace JoeyBot
                             }
                         }
                         break;
+
+                    case Target.SpecificPoint:
+                        botToTargetAngle = Math.Atan2(TargetPointY - carLocation.Y, TargetPointX - carLocation.X);
+                         botFrontToTargetAngle = botToTargetAngle - carRotation.Yaw;
+                        
+
+                        // Correct the angle
+                        botFrontToTargetAngle = CorrectAngle(botFrontToTargetAngle);
+
+                        SetHandbrakeAndBoost(ref controller, ref carLocation, carVelocity, botFrontToTargetAngle);
+
+                        SetJump(ref controller, ref ballLocation, ref carLocation, DistanceToBall, botFrontToBallAngle);
+
+
+                        SetThrottle(ref controller, ref ballLocation, ref carLocation, ballVelocity, DistanceToBall, botFrontToTargetAngle);
+
+                        controller = SetSteeringBasedOnTarget(controller, botFrontToTargetAngle);
+
+                        break;
+
+
+
                       case Target.Waiting:
                        
                         controller.Throttle = 0;
@@ -622,10 +753,9 @@ namespace JoeyBot
 
         private void SetThrottle(ref Controller controller, ref Vector3 ballLocation, ref Vector3 carLocation, Vector3 ballVelocity, double DistanceToBall, double botFrontToTargetAngle)
         {
-            if ((botFrontToTargetAngle > 90 || botFrontToTargetAngle < -90) && target != Target.Waiting)
-                controller.Throttle = 0.5f;
+     
 
-            else if (target != Target.BallLandingPoint && target != Target.Waiting)
+            if (target != Target.BallLandingPoint && target != Target.Waiting)
             {
                 if (ballVelocity.Z == 0 || target == Target.Goal) controller.Throttle = 1;
                 else
@@ -633,10 +763,11 @@ namespace JoeyBot
                     if ((team == 0 && carLocation.Y < ballLocation.Y) || (team == 1 && carLocation.Y > ballLocation.Y)) controller.Throttle = 1;
                     else
                     {
-                        if (DistanceToBall < 500) controller.Throttle = 0.11f;
-                        else if (DistanceToBall < 1000) controller.Throttle = 0.1f;
-                        else if (DistanceToBall < 2000) controller.Throttle = 0.5f;
-                        else
+                        //if (DistanceToBall < 500) controller.Throttle = 0.4f;
+
+                        //else if (DistanceToBall < 1000) controller.Throttle = 0.6f;
+                        //else if (DistanceToBall < 2000) controller.Throttle = 0.8f;
+                        //else
                             controller.Throttle = 1;
 
                     }
@@ -692,30 +823,36 @@ namespace JoeyBot
             if (botFrontToTargetAngle > 0)
                 if (botFrontToTargetAngle > MinimumSteeringAngleRadians)
                     if (botFrontToTargetAngle > DegreesToRadians(90))
-                        controller.Steer = 1f;
-                    else
-                        controller.Steer = 0.75f;
+                        controller.Steer = largeSteering;
+                    else if (botFrontToTargetAngle < DegreesToRadians(45))
+                    {
+                        controller.Steer = smallSteering;
+                    }
+                    else controller.Steer = medSteering;
                 else controller.Steer = 0;
             else
                                                     if (botFrontToTargetAngle < MinimumSteeringAngleRadians * -1)
                 if (botFrontToTargetAngle < DegreesToRadians(-90))
-                    controller.Steer = -1f;
-                else
-                    controller.Steer = -0.75f;
+                    controller.Steer = largeSteering * -1 ;
+                else if (botFrontToTargetAngle > DegreesToRadians(-45))
+                {
+                    controller.Steer = smallSteering * -1;
+                }
+                else controller.Steer = medSteering * -1;
             else controller.Steer = 0;
             return controller;
         }
 
         private static void SetHandbrakeAndBoost(ref Controller controller, ref Vector3 carLocation, System.Numerics.Vector3 carVelocity, double botFrontToTargetAngle)
         {
-            if (Math.Abs(botFrontToTargetAngle) > DegreesToRadians(160) && Math.Sqrt(carVelocity.LengthSquared()) > 0.6)
+            if (Math.Abs(botFrontToTargetAngle) > DegreesToRadians(100) && Math.Sqrt(carVelocity.LengthSquared()) > 0.6)
             {
                 controller.Handbrake = true;
                 controller.Boost = false;
             }
 
 
-            if (carLocation.Z > 30) controller.Handbrake = false;
+            if (carLocation.Z > 50) controller.Handbrake = false;
 
             if (Math.Abs(botFrontToTargetAngle) < MinimumSteeringAngleRadians) controller.Boost = true;
 
@@ -729,6 +866,9 @@ namespace JoeyBot
             target = Target.Ball;
             controller.Boost = true;
             controller.Steer = SetSteerTarget(gameTickPacket, index, 0, 0);
+            if (controller.Steer > 0.2) controller.Steer = 0.2f;
+            if (controller.Steer < -0.2) controller.Steer = -0.2f;
+
             controller.Throttle = 1;
     
             return controller;
@@ -771,12 +911,12 @@ namespace JoeyBot
             botFrontToTargetAngle = CorrectAngle(botFrontToTargetAngle);
        
             if (botFrontToTargetAngle == 0) return 0;
-            if (botFrontToTargetAngle > 0 && botFrontToTargetAngle < DegreesToRadians(20)) return smallSteering;
-            if (botFrontToTargetAngle > 0 && botFrontToTargetAngle < DegreesToRadians(45)) return medSteering;
-            if (botFrontToTargetAngle > 0 && botFrontToTargetAngle > DegreesToRadians(45)) return largeSteering;
-            if (botFrontToTargetAngle < 0 && Math.Abs(botFrontToTargetAngle) < DegreesToRadians(20)) return -smallSteering;
-            if (botFrontToTargetAngle < 0 && Math.Abs( botFrontToTargetAngle) < DegreesToRadians(45)) return -medSteering;
-            if (botFrontToTargetAngle < 0 && Math.Abs(botFrontToTargetAngle) > DegreesToRadians(45)) return -largeSteering;
+            if (botFrontToTargetAngle > 0 && botFrontToTargetAngle < DegreesToRadians(45)) return smallSteering;
+            if (botFrontToTargetAngle > 0 && botFrontToTargetAngle < DegreesToRadians(90)) return medSteering;
+            if (botFrontToTargetAngle > 0 && botFrontToTargetAngle > DegreesToRadians(90)) return largeSteering;
+            if (botFrontToTargetAngle < 0 && Math.Abs(botFrontToTargetAngle) < DegreesToRadians(45)) return -smallSteering;
+            if (botFrontToTargetAngle < 0 && Math.Abs( botFrontToTargetAngle) < DegreesToRadians(90)) return -medSteering;
+            if (botFrontToTargetAngle < 0 && Math.Abs(botFrontToTargetAngle) > DegreesToRadians(90)) return -largeSteering;
             return 0;
 
 
